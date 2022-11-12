@@ -55,7 +55,7 @@ class TransformFusion : public ParamServer
 public:
     std::mutex mtx;
 
-    ros::Subscriber subImuOdometry;
+    ros::Subscriber subImuOdometry;//odometry只有最新的位姿
     ros::Subscriber subLaserOdometry;
 
     ros::Publisher pubImuOdometry;
@@ -148,9 +148,9 @@ public:
         imuOdomQueue.push_back(*odomMsg);
 
         // 从imu里程计队列中删除当前（最近的一帧）激光里程计时刻之前的数据
-        if (lidarOdomTime == -1)
+        if (lidarOdomTime == -1)//未初始化
             return;
-        while (!imuOdomQueue.empty())
+        while (!imuOdomQueue.empty())//弹出imu的数据直到时间戳大于lidarOdomTime（获取与lidarOdomTime最近的一帧imu）
         {
             if (imuOdomQueue.front().header.stamp.toSec() <= lidarOdomTime)
                 imuOdomQueue.pop_front();
@@ -169,19 +169,21 @@ public:
         pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
         
         // 发布当前时刻里程计位姿
-        nav_msgs::Odometry laserOdometry = imuOdomQueue.back();
+        nav_msgs::Odometry laserOdometry = imuOdomQueue.back();//取当前时刻的时间戳
         laserOdometry.pose.pose.position.x = x;
         laserOdometry.pose.pose.position.y = y;
         laserOdometry.pose.pose.position.z = z;
         laserOdometry.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
         pubImuOdometry.publish(laserOdometry);
         // 发布tf，当前时刻odom与baselink系变换关系
+        //ROS中的odom frame是机器人初始化时候的坐标（即原点坐标系），需要注意的是ROS还会发布一个叫odom的topic，这个topic中的信息就是通常意义上的里程计信息
         static tf::TransformBroadcaster tfOdom2BaseLink;
         tf::Transform tCur;
         tf::poseMsgToTF(laserOdometry.pose.pose, tCur);
         if(lidarFrame != baselinkFrame)
             tCur = tCur * lidar2Baselink;
         tf::StampedTransform odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
+        //StampedTransform (const tf::Transform &input, const ros::Time &timestamp, const std::string &frame_id, const std::string &child_frame_id)
         tfOdom2BaseLink.sendTransform(odom_2_baselink);
 
         // 发布imu里程计路径，注：只是最近一帧激光里程计时刻与当前时刻之间的一段
@@ -197,7 +199,7 @@ public:
             pose_stamped.header.frame_id = odometryFrame;
             pose_stamped.pose = laserOdometry.pose.pose;
             imuPath.poses.push_back(pose_stamped);
-            // 删除最近一帧激光里程计时刻之前的imu里程计
+            // 删除最近一帧激光里程计时刻之前的imu里程计，即只保留与lidarOdomTime相距只有1s内的数据
             while(!imuPath.poses.empty() && imuPath.poses.front().header.stamp.toSec() < lidarOdomTime - 1.0)
                 imuPath.poses.erase(imuPath.poses.begin());
             if (pubImuPath.getNumSubscribers() != 0)

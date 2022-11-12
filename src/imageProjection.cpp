@@ -91,7 +91,7 @@ private:
     // 队列front帧，作为当前处理帧点云
     sensor_msgs::PointCloud2 currentCloudMsg;
 
-    // 当前激光帧起止时刻间对应的imu数据，计算相对于起始时刻的旋转增量，以及时时间戳；用于插值计算当前激光帧起止时间范围内，每一时刻的旋转姿态
+    // 当前激光帧起止时刻间对应的imu数据，计算相对于起始时刻的旋转增量，以及时间戳；用于插值计算当前激光帧起止时间范围内，每一时刻的旋转姿态
     double *imuTime = new double[queueLength];
     double *imuRotX = new double[queueLength];
     double *imuRotY = new double[queueLength];
@@ -592,6 +592,7 @@ public:
 
         // 设为离当前时刻最近的旋转增量
         if (pointTime > imuTime[imuPointerFront] || imuPointerFront == 0)
+        //这两种情况一个是imu的数据没这么多，无法覆盖到pointTime这个时刻；另一个是imu的时刻已经在pointTime之后了，之前的数据可能也无法覆盖，都是imu数据不足的情况
         {
             *rotXCur = imuRotX[imuPointerFront];
             *rotYCur = imuRotY[imuPointerFront];
@@ -697,12 +698,13 @@ public:
             if (rowIdn < 0 || rowIdn >= N_SCAN)
                 continue;
 
-            // 扫描线如果有降采样，跳过采样的扫描线这里要跳过
+            // 如果设置了降采样，跳过某些线束，比如64线设置downsampleRate=4，则只处理0,4等线束的数据
             if (rowIdn % downsampleRate != 0)
                 continue;
 
-            float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
+            float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;//atan2的返回值是(-pi,pi]
 
+            //columnIdn经过了一系列变换，使得原本0°和360°之间的断开现在在90°这边，暂时不清楚为啥这么做
             // 水平扫描角度步长，例如一周扫描1800次，则两次扫描间隔角度0.2°
             static float ang_res_x = 360.0/float(Horizon_SCAN);
             int columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
@@ -740,7 +742,7 @@ public:
         for (int i = 0; i < N_SCAN; ++i)
         {
             // 记录每根扫描线起始第5个激光点在一维数组中的索引
-            cloudInfo.startRingIndex[i] = count - 1 + 5;
+            cloudInfo.startRingIndex[i] = count - 1 + 5;//不太清楚这个操作的目的，可能与数据的储存格式相关
 
             for (int j = 0; j < Horizon_SCAN; ++j)
             {
@@ -757,7 +759,7 @@ public:
                 }
             }
             // 记录每根扫描线倒数第5个激光点在一维数组中的索引
-            cloudInfo.endRingIndex[i] = count -1 - 5;
+            cloudInfo.endRingIndex[i] = count -1 - 5;//不太清楚这个操作的目的，可能与数据的储存格式相关
         }
     }
     
