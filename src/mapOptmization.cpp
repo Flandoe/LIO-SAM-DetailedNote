@@ -1319,7 +1319,8 @@ public:
                     float l12 = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) + (z1 - z2)*(z1 - z2));
                     
                     // 两次叉积，得到点到直线的垂线段单位向量，x分量，下面同理
-                    // a×b = c×d，向量d是点0到直线12的垂线向量，模长是其两倍（a012 / l12）
+                    // a×b = c×d，向量d是点0到直线12的垂线向量
+                    // a×b×c与向量d的方向一致，下式前面一串就是a×b×c，|a×b×c|的模是a012*l12，所以下式求的是单位向量
                     float la = ((y1 - y2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1)) 
                               + (z1 - z2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))) / a012 / l12;
 
@@ -1521,7 +1522,7 @@ public:
             coeff.y = coeffSel->points[i].z;
             coeff.z = coeffSel->points[i].x;
             coeff.intensity = coeffSel->points[i].intensity;
-            // 在camera坐标系下的偏导数
+            // 在map坐标系下的偏导数
             float arx = (crx*sry*srz*pointOri.x + crx*crz*sry*pointOri.y - srx*sry*pointOri.z) * coeff.x
                       + (-srx*srz*pointOri.x - crz*srx*pointOri.y - crx*pointOri.z) * coeff.y
                       + (crx*cry*srz*pointOri.x + crx*cry*crz*pointOri.y - cry*srx*pointOri.z) * coeff.z;
@@ -1534,7 +1535,8 @@ public:
             float arz = ((crz*srx*sry - cry*srz)*pointOri.x + (-cry*crz-srx*sry*srz)*pointOri.y)*coeff.x
                       + (crx*crz*pointOri.x - crx*srz*pointOri.y) * coeff.y
                       + ((sry*srz + cry*crz*srx)*pointOri.x + (crz*sry-cry*srx*srz)*pointOri.y)*coeff.z;
-            // jocabian 矩阵的第i行
+            // jocabian 矩阵的第i行，值通过对距离误差d求导得到，对位置变量来说，导数直接是垂线方向（上面求得的边或面的垂线向量，存在coeff里面），因为点在这个方向上移动，距离误差d减小得最快
+            //具体推导见 https://wykxwyc.github.io/2019/08/01/The-Math-Formula-in-LeGO-LOAM/
             matA.at<float>(i, 0) = arz;
             matA.at<float>(i, 1) = arx;
             matA.at<float>(i, 2) = ary;
