@@ -574,6 +574,7 @@ public:
         imuQueImu.push_back(thisImu);
 
         // 要求上一次imu因子图优化执行成功，确保更新了上一帧（激光里程计帧）的状态、偏置，预积分重新计算了
+        //实际上这里doneFirstOpt只在resetParams的时候（imu因子图优化结果，速度或者偏置过大，认为失败）才会设为false，所以这个条件在doneFirstOpt第一次置为true后就失效了
         if (doneFirstOpt == false)
             return;
 
